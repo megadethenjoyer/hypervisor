@@ -1,0 +1,93 @@
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include <limine.h>
+#include <ia32.h>
+
+#include <idt.h>
+#include <io.h>
+#include <msr.h>
+#include <arch.h>
+#include <pmm.h>
+#include <mem.h>
+#include <vmx.h>
+#include <log.h>
+
+__attribute__((used, section(".limine_requests")))
+static volatile uint64_t limine_base_revision[] = LIMINE_BASE_REVISION(4);
+
+__attribute__((used, section(".limine_requests")))
+static volatile struct limine_memmap_request limine_memmap = {
+    .id = LIMINE_MEMMAP_REQUEST_ID,
+    .revision = 0
+};
+
+__attribute__((used, section(".limine_requests")))
+static volatile struct limine_hhdm_request limine_hhdm = {
+    .id = LIMINE_HHDM_REQUEST_ID,
+    .revision = 0
+};
+
+__attribute__((used, section(".limine_requests")))
+static volatile struct limine_executable_address_request limine_exec = {
+    .id = LIMINE_EXECUTABLE_ADDRESS_REQUEST_ID,
+    .revision = 0
+};
+
+__attribute__((used, section(".limine_requests_start")))
+static volatile uint64_t limine_requests_start_marker[] = LIMINE_REQUESTS_START_MARKER;
+
+__attribute__((used, section(".limine_requests_end")))
+static volatile uint64_t limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARKER;
+
+
+void handle_interrupt( ) {
+    for ( int i = 0; i < 3; i++ ) {
+        io_outb(0xE9, 'I');
+        io_outb(0xE9, 'N');
+        io_outb(0xE9, 'T');
+    }
+    io_outb(0xE9, '\n');
+    hcf();
+}
+
+
+void kmain( ) {
+    if ( LIMINE_BASE_REVISION_SUPPORTED( limine_base_revision ) == false ) {
+        hcf();
+    }
+
+    idt_setup( );
+    IA32_VMX_BASIC_REGISTER basic;
+    
+    uintptr_t hhdm = limine_hhdm.response->offset;
+    
+    pmm_init( limine_memmap.response, hhdm, limine_exec.response );
+    
+    CR0 cr0 = arch_read_cr0( );
+    cr0.NumericError = 1;
+    arch_write_cr0( cr0 );
+    
+    CR4 cr4 = arch_read_cr4( );
+    cr4.VmxEnable = 1;
+    arch_write_cr4( cr4 );
+    
+    // todo: error handling
+    struct vmx_vcpu vcpu = { 0 };
+    vmx_create_vcpu( &vcpu, hhdm );
+    vmx_do_vmxon( &vcpu );
+    vmx_setup_vmcs( &vcpu );
+
+    LOGLN( LOG( "vmlaunch" ) );
+    vmx_launch_vm( );
+    LOGLN( LOG( "end vmlaunch" ) );
+
+    uint64_t er = 0xCCCCCCCC;
+    er = vmx_vmread( VMCS_EXIT_REASON );
+
+    LOGLN( LOG_HEX( er ) );
+    
+    LOGLN( "Finished :) ");
+    
+    hcf( );
+}

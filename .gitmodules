@@ -1,0 +1,16 @@
+[submodule "limine"]
+	path = limine
+	url = https://codeberg.org/Limine/limine.git
+	branch = v10.x-binary
+[submodule "limine-protocol"]
+	path = limine-protocol
+	url = https://codeberg.org/Limine/limine-protocol.git
+[submodule "cc-runtime"]
+	path = cc-runtime
+	url = https://codeberg.org/OSDev/cc-runtime.git
+[submodule "freestnd-c-hdrs-0bsd"]
+	path = freestnd-c-hdrs-0bsd
+	url = https://codeberg.org/OSDev/freestnd-c-hdrs-0bsd.git
+[submodule "ia32-doc"]
+	path = ia32-doc
+	url = https://github.com/ia32-doc/ia32-doc.git
