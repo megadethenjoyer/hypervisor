@@ -42,12 +42,7 @@ static volatile uint64_t limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARK
 
 
 void handle_interrupt( ) {
-    for ( int i = 0; i < 3; i++ ) {
-        io_outb(0xE9, 'I');
-        io_outb(0xE9, 'N');
-        io_outb(0xE9, 'T');
-    }
-    io_outb(0xE9, '\n');
+    LOGLN( LOG( "INT" ) );
     hcf();
 }
 

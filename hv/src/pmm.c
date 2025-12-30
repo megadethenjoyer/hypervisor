@@ -106,7 +106,6 @@ size_t reserve_exec_pages( struct limine_executable_address_response *exec, size
 #define PAGE_FREE( index ) ( test_bit( index ) == 0 )
 
 #define MiB( n ) ( n * 1024 * 1024 )
-void io_outb(uint16_t,uint8_t);
 void pmm_init(
     struct limine_memmap_response *memmap,
     uintptr_t hhdm,

@@ -100,16 +100,14 @@ bool check_legacy( uint64_t msr_index, uint64_t value ) {
     return true;
 }
 
-#define TRUECHECK( msr, ctrl, ch ) if ( !check_true( IA32_VMX_##msr, ctrl.AsUInt ) ) {\
-    io_outb( 0xE9, ch ); \
-    io_outb( 0xE9, '\n' ); \
+#define TRUECHECK( msr, ctrl ) if ( !check_true( IA32_VMX_##msr, ctrl.AsUInt ) ) {\
+    LOGLN( LOG( "[vmx] Failed TRUECHECK of " ); LOG( "IA32_VMX_" #msr ) ); \
     hcf( );\
 }
 
-#define LEGCHECK( msr, ctrl, ch ) TRUECHECK( TRUE_##msr, ctrl, ch ); \
+#define LEGCHECK( msr, ctrl ) TRUECHECK( TRUE_##msr, ctrl ); \
 if ( !check_legacy( IA32_VMX_##msr, ctrl.AsUInt ) ) {\
-    io_outb( 0xE9, ch ); \
-    io_outb( 0xE9, '\n' ); \
+    LOGLN( LOG( "[vmx] Failed LEGCHECK of " ); LOG( "IA32_VMX" #msr ) ); \
     hcf( );\
 }
 
@@ -130,12 +128,12 @@ void write_vmcs_fields( ) {
     proc_based.AsUInt |= ( 1 << 13 ) | ( 1 << 14 ) | ( 1 << 15 ) | ( 1 << 16 );
     proc_based.AsUInt |= 1 << 26;
     proc_based.HltExiting = 1;
-    LEGCHECK( PROCBASED_CTLS, proc_based, 'a' );
+    LEGCHECK( PROCBASED_CTLS, proc_based );
 
     IA32_VMX_PROCBASED_CTLS2_REGISTER proc_based2 = { 0 };
     proc_based2.AsUInt = TRUEREQ( PROCBASED_CTLS2 );
     proc_based2.UnrestrictedGuest = 1;
-    TRUECHECK( PROCBASED_CTLS2, proc_based2, 'b' );
+    TRUECHECK( PROCBASED_CTLS2, proc_based2 );
 
     vmx_vmwrite( VMCS_CTRL_PROCESSOR_BASED_VM_EXECUTION_CONTROLS,
         proc_based.AsUInt );
@@ -145,12 +143,12 @@ void write_vmcs_fields( ) {
     IA32_VMX_EXIT_CTLS_REGISTER vmexit = { 0 };
     vmexit.AsUInt = ( msr_rdmsr( IA32_VMX_EXIT_CTLS ) & 0xFFFFFFFF ) | ( msr_rdmsr( IA32_VMX_TRUE_EXIT_CTLS ) & 0xFFFFFFFF );
     vmexit.HostAddressSpaceSize = 1;
-    LEGCHECK( EXIT_CTLS, vmexit, 'c' );
+    LEGCHECK( EXIT_CTLS, vmexit );
     vmx_vmwrite( VMCS_CTRL_PRIMARY_VMEXIT_CONTROLS, vmexit.AsUInt );
 
     IA32_VMX_ENTRY_CTLS_REGISTER vmentry = { 0 };
     vmentry.AsUInt = LEGREQ( ENTRY_CTLS );
-    LEGCHECK( ENTRY_CTLS, vmentry, 'd' );
+    LEGCHECK( ENTRY_CTLS, vmentry );
     vmx_vmwrite( VMCS_CTRL_VMENTRY_CONTROLS, vmentry.AsUInt );
 
     vmx_vmwrite( VMCS_CTRL_CR3_TARGET_COUNT, 0 );
