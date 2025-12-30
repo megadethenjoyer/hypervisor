@@ -87,7 +87,7 @@ void kmain( ) {
 
     LOGLN( LOG_HEX( er ) );
     
-    LOGLN( "Finished :) ");
+    LOGLN( LOG( "Finished :)" ) );
     
     hcf( );
 }
