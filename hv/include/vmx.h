@@ -9,7 +9,8 @@
 enum vmx_error {
     vmx_ok = 0,
     vmx_error_valid = 1,
-    vmx_error_invalid = 2
+    vmx_error_invalid = 2,
+    vmx_vmlaunch_ok = 10,
 };
 
 enum vmx_error vmx_vmxon( pa_t *p_vmxon_region_pa );
@@ -19,7 +20,7 @@ enum vmx_error vmx_vmptrld( pa_t *p_vmcs_pa );
 uint64_t vmx_vmread( uint64_t field_id );
 enum vmx_error vmx_vmwrite( uint64_t field_id, uint64_t value );
 // enum vmx_error vmx_vmlaunch( );
-void vmx_launch_vm( );
+enum vmx_error vmx_launch_vm( );
 
 struct vmx_vcpu {
     uintptr_t hhdm;
@@ -29,6 +30,21 @@ struct vmx_vcpu {
 
     VMCS *vmcs;
     pa_t vmcs_pa;
+
+    uint8_t *page;
+    pa_t page_pa;
+
+    EPT_PML4E *pml4;
+    pa_t pml4_pa;
+
+    EPT_PDPTE *pdpt;
+    pa_t pdpt_pa;
+
+    EPT_PDE *pd;
+    pa_t pd_pa;
+
+    EPT_PTE *pt;
+    pa_t pt_pa;
 };
 
 bool vmx_create_vcpu( struct vmx_vcpu *vcpu, uintptr_t hhdm );

@@ -59,6 +59,8 @@ vmx_launch_vm:
     lea rcx, .return
     vmwrite rax, rcx
     vmlaunch
+    jmp vmx_error_handle
 
     .return:
+    mov rax, 10
     ret

@@ -46,7 +46,6 @@ void handle_interrupt( ) {
     hcf();
 }
 
-
 void kmain( ) {
     if ( LIMINE_BASE_REVISION_SUPPORTED( limine_base_revision ) == false ) {
         hcf();
@@ -61,6 +60,7 @@ void kmain( ) {
     
     CR0 cr0 = arch_read_cr0( );
     cr0.NumericError = 1;
+    cr0.CacheDisable = 1;
     arch_write_cr0( cr0 );
     
     CR4 cr4 = arch_read_cr4( );
@@ -73,14 +73,22 @@ void kmain( ) {
     vmx_do_vmxon( &vcpu );
     vmx_setup_vmcs( &vcpu );
 
-    LOGLN( LOG( "vmlaunch" ) );
-    vmx_launch_vm( );
-    LOGLN( LOG( "end vmlaunch" ) );
+    vcpu.page[ 0xFF0 ] = 0xEB;
+    vcpu.page[ 0xFF1 ] = 0xFE;
 
-    uint64_t er = 0xCCCCCCCC;
-    er = vmx_vmread( VMCS_EXIT_REASON );
+    LOGLN( LOG("[vmx] EPTP = " ); LOG_HEX( vmx_vmread( VMCS_CTRL_EPT_POINTER ) ) );
 
-    LOGLN( LOG_HEX( er ) );
+    LOGLN( LOG( "guest rip = " ); LOG_HEX( vmx_vmread( VMCS_GUEST_RIP ) ) );
+    LOGLN( LOG( "guest rsp = " ); LOG_HEX( vmx_vmread( VMCS_GUEST_RSP ) ) );
+    LOGLN( LOG( "guest cr0 = " ); LOG_HEX( vmx_vmread( VMCS_GUEST_CR0 ) ) );
+    LOGLN( LOG( "vmlaunch( ) = " ); LOG_HEX( ( uint32_t )vmx_launch_vm( ) ) );
+    LOGLN( LOG( "guest rip = " ); LOG_HEX( vmx_vmread( VMCS_GUEST_RIP ) ) );
+    LOGLN( LOG( "guest rsp = " ); LOG_HEX( vmx_vmread( VMCS_GUEST_RSP ) ) );
+    LOGLN( LOG( "guest cr0 = " ); LOG_HEX( vmx_vmread( VMCS_GUEST_CR0 ) ) );
+
+
+    LOGLN( LOG( "GPA: " ); LOG_HEX( vmx_vmread( VMCS_GUEST_PHYSICAL_ADDRESS ) ) );
+    LOGLN( LOG( "VMX exit reason: " ); LOG_HEX( vmx_vmread( VMCS_EXIT_REASON ) ) );
     
     LOGLN( LOG( "Finished :)" ) );
     

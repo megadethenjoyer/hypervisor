@@ -42,7 +42,6 @@ bool vmx_create_vcpu( struct vmx_vcpu *vcpu, uintptr_t hhdm ) {
 
     vcpu->hhdm = hhdm;
     vcpu->vmxon_pa = pmm_alloc( 1 );
-    LOGLN( LOG("a"); LOG_HEX((uint32_t)0xA));
     LOGLN( LOG( "[vmx] vcpu->vmxon_pa = " ); LOG_HEX( vcpu->vmxon_pa ) );
     vcpu->vmcs_pa = pmm_alloc( 1 );
     LOGLN( LOG( "[vmx] vcpu->vmcs_pa = " ); LOG_HEX( vcpu->vmcs_pa ) );
@@ -105,7 +104,7 @@ bool check_legacy( uint64_t msr_index, uint64_t value ) {
     hcf( );\
 }
 
-#define LEGCHECK( msr, ctrl ) TRUECHECK( TRUE_##msr, ctrl ); \
+#define LEGCHECK( msr, ctrl ) TRUECHECK( TRUE_##msr, ctrl );  \
 if ( !check_legacy( IA32_VMX_##msr, ctrl.AsUInt ) ) {\
     LOGLN( LOG( "[vmx] Failed LEGCHECK of " ); LOG( "IA32_VMX" #msr ) ); \
     hcf( );\
@@ -117,7 +116,7 @@ if ( !check_legacy( IA32_VMX_##msr, ctrl.AsUInt ) ) {\
 // true required
 #define TRUEREQ( msr ) ( ( msr_rdmsr( IA32_VMX_##msr ) & 0xFFFFFFFF ) )
 
-void write_vmcs_fields( ) {
+void write_vmcs_fields( struct vmx_vcpu *vcpu ) {
     vmx_vmwrite( VMCS_CTRL_PIN_BASED_VM_EXECUTION_CONTROLS,
         ( msr_rdmsr( IA32_VMX_PINBASED_CTLS ) & 0xFFFFFFFF ) | ( 1 << 1 ) | ( 1 << 2 ) | ( 1 << 4 ) );
         
@@ -127,18 +126,25 @@ void write_vmcs_fields( ) {
     proc_based.AsUInt |= ( 1 << 4 ) | ( 1 << 5 ) | ( 1 << 6 );
     proc_based.AsUInt |= ( 1 << 13 ) | ( 1 << 14 ) | ( 1 << 15 ) | ( 1 << 16 );
     proc_based.AsUInt |= 1 << 26;
+    proc_based.ActivateSecondaryControls = 1;
     proc_based.HltExiting = 1;
     LEGCHECK( PROCBASED_CTLS, proc_based );
 
     IA32_VMX_PROCBASED_CTLS2_REGISTER proc_based2 = { 0 };
     proc_based2.AsUInt = TRUEREQ( PROCBASED_CTLS2 );
+    proc_based2.EnableEpt = 1;
+    // proc_based2.EptViolation = 1;
     proc_based2.UnrestrictedGuest = 1;
+    LOGLN( LOG( "[vmx] procbased2 = " ); LOG_HEX( (uint64_t)proc_based2.AsUInt ); LOG( " true = " ); LOG_HEX( msr_rdmsr( IA32_VMX_PROCBASED_CTLS2 ) ) );
     TRUECHECK( PROCBASED_CTLS2, proc_based2 );
 
     vmx_vmwrite( VMCS_CTRL_PROCESSOR_BASED_VM_EXECUTION_CONTROLS,
         proc_based.AsUInt );
     vmx_vmwrite( VMCS_CTRL_SECONDARY_PROCESSOR_BASED_VM_EXECUTION_CONTROLS,
         proc_based2.AsUInt );
+
+    // vmx_vmwrite( VMCS_CTRL_EXCEPTION_BITMAP, 0xFFFFFFFF );
+    vmx_vmwrite( VMCS_CTRL_EXCEPTION_BITMAP, 0  );
 
     IA32_VMX_EXIT_CTLS_REGISTER vmexit = { 0 };
     vmexit.AsUInt = ( msr_rdmsr( IA32_VMX_EXIT_CTLS ) & 0xFFFFFFFF ) | ( msr_rdmsr( IA32_VMX_TRUE_EXIT_CTLS ) & 0xFFFFFFFF );
@@ -170,7 +176,7 @@ void write_vmcs_fields( ) {
 	uint64_t host_gs_base = msr_rdmsr(IA32_GS_BASE);
 	// uint64_t host_tr_base = gdtr.BaseAddress + ;
         SEGMENT_DESCRIPTOR_64 host_tr = ((SEGMENT_DESCRIPTOR_64*)(gdtr.BaseAddress))[tr>>3];
-	uint64_t host_tr_base = host_tr.BaseAddressLow | ( host_tr.BaseAddressMiddle << 16 ) | ( host_tr.BaseAddressHigh << 24) | ( host_tr.BaseAddressUpper << 32);
+	uint64_t host_tr_base = host_tr.BaseAddressLow | ( (uint64_t)host_tr.BaseAddressMiddle << 16 ) | ( (uint64_t)host_tr.BaseAddressHigh << 24) | ( (uint64_t)host_tr.BaseAddressUpper << 32);
     LOGLN(LOG("[vmx] host_tr_base = "); LOG_HEX(host_tr_base));
 
 	vmx_vmwrite(VMCS_HOST_ES_SELECTOR, es & 0xF8);
@@ -235,6 +241,7 @@ void write_vmcs_fields( ) {
 	vmx_vmwrite(VMCS_GUEST_GS_ACCESS_RIGHTS, AR_DATA);
 
 	vmx_vmwrite(VMCS_GUEST_CS_SELECTOR, 0xF000);
+	// vmx_vmwrite(VMCS_GUEST_CS_BASE, 0x00000000ull);
 	vmx_vmwrite(VMCS_GUEST_CS_BASE, 0xFFFF0000ull);
 	vmx_vmwrite(VMCS_GUEST_CS_LIMIT, 0xFFFF);
 	vmx_vmwrite(VMCS_GUEST_CS_ACCESS_RIGHTS, AR_CODE);
@@ -254,18 +261,22 @@ void write_vmcs_fields( ) {
 	vmx_vmwrite(VMCS_GUEST_LDTR_LIMIT, 0);
 	vmx_vmwrite(VMCS_GUEST_LDTR_ACCESS_RIGHTS, AR_UNUSABLE);
 
-	uint64_t rip = 0;
+	uint64_t rip = 0xFFF0;
 	uint64_t rflags = 0x2;
 
     uint64_t gcr0 = msr_rdmsr(IA32_VMX_CR0_FIXED0) & msr_rdmsr(IA32_VMX_CR0_FIXED1);
+    gcr0 = gcr0 & ~((1 << 0) | (1 << 31));
+    // uint64_t gcr0 = 0x60000010;
+    CR4;
     uint64_t gcr4 = msr_rdmsr(IA32_VMX_CR4_FIXED0) & msr_rdmsr(IA32_VMX_CR4_FIXED1);
+    // uint64_t gcr4 = 0;
 
 	vmx_vmwrite(VMCS_GUEST_CR0, gcr0);
 	vmx_vmwrite(VMCS_GUEST_CR3, 0);
 	vmx_vmwrite(VMCS_GUEST_CR4, gcr4);
 
 	vmx_vmwrite(VMCS_GUEST_RIP, rip);
-	vmx_vmwrite(VMCS_GUEST_RSP, rip);
+	vmx_vmwrite(VMCS_GUEST_RSP, 0x00001000);
 	vmx_vmwrite(VMCS_GUEST_RFLAGS, rflags);
 
 	vmx_vmwrite(VMCS_GUEST_PAT, msr_rdmsr(IA32_PAT));
@@ -278,6 +289,68 @@ void write_vmcs_fields( ) {
 	vmx_vmwrite(VMCS_CTRL_CR4_GUEST_HOST_MASK, 0);
 	vmx_vmwrite(VMCS_CTRL_CR0_READ_SHADOW, gcr0);
 	vmx_vmwrite(VMCS_CTRL_CR4_READ_SHADOW, gcr4);
+
+    EPT_POINTER eptp = { 0 };
+    eptp.PageFrameNumber = vcpu->pml4_pa >> 12;
+    eptp.MemoryType = 6;
+    eptp.PageWalkLength = 3;
+    vmx_vmwrite( VMCS_CTRL_EPT_POINTER, eptp.AsUInt );
+}
+
+void setup_ept( struct vmx_vcpu *vcpu ) {
+    vcpu->pml4_pa = pmm_alloc( 1 );
+    vcpu->pml4 = ( void* )( vcpu->hhdm + vcpu->pml4_pa );
+    vcpu->pdpt_pa = pmm_alloc( 1 );
+    vcpu->pdpt = ( void* )( vcpu->hhdm + vcpu->pdpt_pa );
+    vcpu->pd_pa = pmm_alloc( 1 );
+    vcpu->pd = ( void * )( vcpu->hhdm + vcpu->pd_pa );
+    vcpu->pt_pa = pmm_alloc( 1 );
+    vcpu->pt = ( void * )( vcpu->hhdm + vcpu->pt_pa );
+    
+    memset( vcpu->pml4, 0, 0x1000 );
+    memset( vcpu->pdpt, 0, 0x1000 );
+
+    vcpu->page_pa = pmm_alloc_bytes( MiB( 2 ) );
+    vcpu->page = ( void * )( vcpu->hhdm + vcpu->page_pa );
+
+    LOGLN( LOG( "[vmx] Page: "); LOG_HEX( vcpu->page_pa ) );
+
+    EPT_PTE pte = { 0 };
+    pte.ReadAccess = 1;
+    pte.WriteAccess = 0;
+    pte.ExecuteAccess = 1;
+    pte.PageFrameNumber = vcpu->page_pa >> 12;
+
+    EPT_PDE pde = { 0 };
+    pde.ReadAccess = 1;
+    pde.WriteAccess = 1;
+    pde.ExecuteAccess = 1;
+    pde.PageFrameNumber = vcpu->pt_pa >> 12;
+
+    EPT_PDPTE pdpte = { 0 };
+    pdpte.ReadAccess = 1;   
+    pdpte.WriteAccess = 1;   
+    pdpte.ExecuteAccess = 1;   
+    pdpte.PageFrameNumber = vcpu->pd_pa >> 12;
+
+    EPT_PML4E pml4e = { 0 };
+    pml4e.ReadAccess = 1;
+    pml4e.WriteAccess = 1;
+    pml4e.ExecuteAccess = 1;
+    pml4e.PageFrameNumber = vcpu->pdpt_pa >> 12;
+
+    for ( int i = 0; i < 512; i++ ) {
+        vcpu->pt[ i ].AsUInt = pte.AsUInt;
+    }
+    for ( int i = 0; i < 512; i++ ) {
+        vcpu->pd[ i ].AsUInt = pde.AsUInt;
+    }
+    for ( int i = 0; i < 512; i++ ) {
+        vcpu->pdpt[ i ].AsUInt = pdpte.AsUInt;
+    }
+    for ( int i = 0; i < 512; i++ ) {
+        vcpu->pml4[ i ].AsUInt = pml4e.AsUInt;
+    }
 }
 
 bool vmx_setup_vmcs( struct vmx_vcpu *vcpu ) {
@@ -289,7 +362,9 @@ bool vmx_setup_vmcs( struct vmx_vcpu *vcpu ) {
         return false;
     }
 
-    write_vmcs_fields( );
+    setup_ept( vcpu );
+
+    write_vmcs_fields( vcpu );
 
     return true;
 }
