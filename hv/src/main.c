@@ -65,6 +65,7 @@ void kmain( ) {
     
     CR4 cr4 = arch_read_cr4( );
     cr4.VmxEnable = 1;
+    cr4.PageSizeExtensions = 1;
     arch_write_cr4( cr4 );
     
     // todo: error handling
@@ -73,8 +74,19 @@ void kmain( ) {
     vmx_do_vmxon( &vcpu );
     vmx_setup_vmcs( &vcpu );
 
-    vcpu.page[ 0xFF0 ] = 0xEB;
-    vcpu.page[ 0xFF1 ] = 0xFE;
+    struct cpuid_regs regs = { 0 };
+    arch_cpuid( 1, &regs );
+    LOGLN( LOG_HEX( regs.ebx ) );
+    CPUID_EAX_01 cpuid = { 0 };
+    cpuid.CpuidFeatureInformationEdx.AsUInt = regs.edx;
+    if ( cpuid.CpuidFeatureInformationEdx.PageSizeExtension == 0 ) {
+        LOGLN( LOG( "PSE not supported" ) );
+    }
+
+    for ( int i = 0; i < MiB( 2 ); i += 2 ) {
+        vcpu.page[ i ] = 0xEB;
+        vcpu.page[ i + 1 ] = 0xFE;
+    }
 
     LOGLN( LOG("[vmx] EPTP = " ); LOG_HEX( vmx_vmread( VMCS_CTRL_EPT_POINTER ) ) );
 

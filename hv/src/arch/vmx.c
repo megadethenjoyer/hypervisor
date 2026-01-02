@@ -315,17 +315,19 @@ void setup_ept( struct vmx_vcpu *vcpu ) {
 
     LOGLN( LOG( "[vmx] Page: "); LOG_HEX( vcpu->page_pa ) );
 
-    EPT_PTE pte = { 0 };
-    pte.ReadAccess = 1;
-    pte.WriteAccess = 0;
-    pte.ExecuteAccess = 1;
-    pte.PageFrameNumber = vcpu->page_pa >> 12;
+    // EPT_PTE pte = { 0 };
+    // pte.ReadAccess = 1;
+    // pte.WriteAccess = 0;
+    // pte.ExecuteAccess = 1;
+    // pte.PageFrameNumber = vcpu->page_pa >> 12;
 
-    EPT_PDE pde = { 0 };
+    EPT_PDE_2MB pde = { 0 };
     pde.ReadAccess = 1;
     pde.WriteAccess = 1;
     pde.ExecuteAccess = 1;
-    pde.PageFrameNumber = vcpu->pt_pa >> 12;
+    // pde.PageFrameNumber = vcpu->pt_pa >> 12;
+    pde.LargePage = 1;
+    pde.PageFrameNumber = vcpu->page_pa >> 21;
 
     EPT_PDPTE pdpte = { 0 };
     pdpte.ReadAccess = 1;   
@@ -339,9 +341,9 @@ void setup_ept( struct vmx_vcpu *vcpu ) {
     pml4e.ExecuteAccess = 1;
     pml4e.PageFrameNumber = vcpu->pdpt_pa >> 12;
 
-    for ( int i = 0; i < 512; i++ ) {
-        vcpu->pt[ i ].AsUInt = pte.AsUInt;
-    }
+    // for ( int i = 0; i < 512; i++ ) {
+    //     vcpu->pt[ i ].AsUInt = pte.AsUInt;
+    // }
     for ( int i = 0; i < 512; i++ ) {
         vcpu->pd[ i ].AsUInt = pde.AsUInt;
     }
