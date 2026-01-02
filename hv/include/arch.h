@@ -4,6 +4,12 @@
 #include <ia32.h>
 #include <stdint.h>
 
+#define ARCH_BASE_ADDR_FROM_SEGMENT( desc ) \
+        ( desc.BaseAddressLow | \
+        ( ( uint64_t )( desc.BaseAddressMiddle ) << 16 ) | \
+        ( ( uint64_t )( desc.BaseAddressHigh   ) << 24 ) | \
+        ( ( uint64_t )( desc.BaseAddressUpper  ) << 32 ) )
+
 struct cpuid_regs {
     uint32_t eax;
     uint32_t ebx;
@@ -23,5 +29,16 @@ void arch_write_cr4( CR4 cr4 );
 void arch_hcf( );
 
 #define hcf( ) arch_hcf( )
+
+uint16_t arch_read_es( );
+uint16_t arch_read_cs( );
+uint16_t arch_read_ss( );
+uint16_t arch_read_ds( );
+uint16_t arch_read_fs( );
+uint16_t arch_read_gs( );
+uint16_t arch_read_tr( );
+
+void arch_sgdt( void *gdt );
+void arch_sidt( void *idt );
 
 #endif // ARCH_H

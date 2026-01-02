@@ -51,6 +51,9 @@ bool vmx_create_vcpu( struct vmx_vcpu *vcpu, uintptr_t hhdm );
 bool vmx_check_cr_fixed( );
 uint32_t vmx_get_revision_id( );
 bool vmx_do_vmxon( struct vmx_vcpu *vcpu );
+
 bool vmx_setup_vmcs( struct vmx_vcpu *vcpu );
+void vmx_save_host_state( );
+void vmx_setup_ept( struct vmx_vcpu *vcpu );
 
 #endif // VMX_H
