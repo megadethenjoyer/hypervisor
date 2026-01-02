@@ -60,7 +60,7 @@ void kmain( ) {
     
     CR0 cr0 = arch_read_cr0( );
     cr0.NumericError = 1;
-    cr0.CacheDisable = 1;
+    // cr0.CacheDisable = 1;
     arch_write_cr0( cr0 );
     
     CR4 cr4 = arch_read_cr4( );
@@ -83,10 +83,18 @@ void kmain( ) {
         LOGLN( LOG( "PSE not supported" ) );
     }
 
-    for ( int i = 0; i < MiB( 2 ); i += 2 ) {
-        vcpu.page[ i ] = 0xEB;
-        vcpu.page[ i + 1 ] = 0xFE;
-    }
+    pa_t pa = vmx_gpa_to_pa_always( &vcpu, 0xFFFFFFF0 );
+    LOGLN( LOG( "[vmx] GPA 0xFFFF'FFF0 = "); LOG_HEX( pa ) );
+
+    uint8_t *reset_vector = ( void * )( hhdm + pa );
+    // KEEP THE BELOW LINE INTACT, without it an interrupt happens. Why? I don't know. TODO: Fix that? that is NOT wanted behavior. but I'll leave it be
+    LOGLN( LOG( "reset vector HHDM = "); LOG_HEX( ( uint64_t )( reset_vector ) ); LOG( " cuz HHDM offset = "); LOG_HEX( hhdm ) );
+    reset_vector[ 0 ] = 0xEB;
+    
+    // This line is unnecessary, you can just use reset_vector, but it's for testing
+    // also hhdm doesn't work but vcpu.hhdm does, weird. Must fix (for now just use vcpu.hhdm)
+    *( uint8_t * )( vcpu.hhdm + vmx_gpa_to_pa_always( &vcpu, 0xFFFFFFF1 ) ) = 0xFE;
+    // reset_vector[ 1 ] = 0xFE;
 
     LOGLN( LOG("[vmx] EPTP = " ); LOG_HEX( vmx_vmread( VMCS_CTRL_EPT_POINTER ) ) );
 

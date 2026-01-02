@@ -36,15 +36,6 @@ struct vmx_vcpu {
 
     EPT_PML4E *pml4;
     pa_t pml4_pa;
-
-    EPT_PDPTE *pdpt;
-    pa_t pdpt_pa;
-
-    EPT_PDE *pd;
-    pa_t pd_pa;
-
-    EPT_PTE *pt;
-    pa_t pt_pa;
 };
 
 bool vmx_create_vcpu( struct vmx_vcpu *vcpu, uintptr_t hhdm );
@@ -54,6 +45,13 @@ bool vmx_do_vmxon( struct vmx_vcpu *vcpu );
 
 bool vmx_setup_vmcs( struct vmx_vcpu *vcpu );
 void vmx_save_host_state( );
+
+typedef pa_t gpa_t;
+
 void vmx_setup_ept( struct vmx_vcpu *vcpu );
+
+// If the mapping is non existent, create one and allocate the 2MiB page
+// TODO: maybe don't always allocate 2MiB pages?
+pa_t vmx_gpa_to_pa_always( struct vmx_vcpu *vcpu, gpa_t gpa );
 
 #endif // VMX_H
